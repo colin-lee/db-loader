@@ -82,7 +82,9 @@ if __name__ == '__main__':
     env_pwd = os.environ.get('PGPASSWORD')
     if options.no_pwd and env_pwd:
         pwd = env_pwd
-    # 连接数据库
+    os.environ['PGOPTIONS'] = '-c statement_timeout=0'
+
+    # 连接数据库，pgbouncer可能不支持对应参数，必须直连数据库
     conn = None
     try:
         conn = psycopg2.connect(database=options.database, user=options.username, password=pwd,
