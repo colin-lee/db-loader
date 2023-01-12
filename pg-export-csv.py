@@ -107,6 +107,7 @@ if __name__ == '__main__':
         cmd = options.command if options.command else query
         limit = 'LIMIT ' + options.limit if options.limit else ""
         sql = "COPY(%s %s) TO STDOUT WITH CSV HEADER" % (cmd, limit)
+        sql = "SET SESSION lock_timeout='8500s';\nSET SESSION statement_timeout='8500s';\n" + sql
         if options.verbose:
             print(sql)
         csv = workdir + '/' + tbl + ".csv"
