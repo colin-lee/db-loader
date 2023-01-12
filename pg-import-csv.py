@@ -95,18 +95,21 @@ if __name__ == '__main__':
 
     cursor = conn.cursor()
 
-    tbl = options.table
     csv = options.file
+    tbl = options.table
+    tmp_tbl = 't_' + tbl + '_temp'
+    sch = options.schema
+    if sch != "public" and len(sch) > 0:
+        tbl = sch + '.' + tbl
 
     # 创建临时表做导入，避免主键冲突
-    sql = "CREATE TEMP TABLE t_%s_temp ON COMMIT DROP AS SELECT * FROM %s LIMIT 0" % (tbl, tbl)
-    # sql = 'SELECT * INTO TEMP TABLE %s FROM %s LIMIT 0' % (tbl_tmp, tbl)
+    sql = "CREATE TEMP TABLE %s ON COMMIT DROP AS SELECT * FROM %s LIMIT 0" % (tmp_tbl, tbl)
     if options.verbose:
         print(sql)
     cursor.execute(sql)
 
     # 检查临时表字段
-    sql = 'SELECT * FROM t_%s_temp LIMIT 0' % tbl
+    sql = 'SELECT * FROM %s LIMIT 0' % tmp_tbl
     if options.verbose:
         print(sql)
     cursor.execute(sql)
@@ -115,27 +118,27 @@ if __name__ == '__main__':
 
     # 导入csv到临时表
     head = firstline(csv)
-    sql = "COPY t_%s_temp(%s) FROM STDIN WITH CSV HEADER" % (tbl, head)
+    sql = "COPY %s(%s) FROM STDIN WITH CSV HEADER" % (tmp_tbl, head)
     if options.verbose:
         print(sql)
     csf = open(csv)
     try:
         cursor.copy_expert(sql, csf)
     except Exception as e:
-        print('cannot copy into t_' + tbl + "_temp from " + csv, e)
+        print('cannot copy into ' + tmp_tbl + ' from ' + csv, e)
         sys.exit(1)
     finally:
         csf.close()
 
     # 统计临时表数据
-    sql = 'SELECT count(*) FROM t_%s_temp' % tbl
+    sql = 'SELECT count(*) FROM %s' % tmp_tbl
     if options.verbose:
         print(sql)
     count = fetchone(cursor, sql)[0]
     print('IMPORT %d items from %s' % (count, csv))
 
     # 从临时表复制到正式表，忽略主键冲突
-    sql = 'INSERT INTO %s(%s) SELECT %s FROM t_%s_temp ON CONFLICT DO NOTHING' % (tbl, head, head, tbl)
+    sql = 'INSERT INTO %s(%s) SELECT %s FROM %s ON CONFLICT DO NOTHING' % (tbl, head, head, tmp_tbl)
     if options.verbose:
         print(sql)
     cursor.execute(sql)
